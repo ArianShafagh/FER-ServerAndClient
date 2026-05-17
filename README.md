@@ -9,8 +9,21 @@ Realtime facial emotion recognition with a FastAPI server, a webcam client, and 
 - [api/fastapi_client.py](api/fastapi_client.py): webcam client that sends frames to the server.
 - [main/app.py](main/app.py): shared emotion detection logic used by the server and standalone runner.
 - [requirements.txt](requirements.txt): Python dependencies.
-- `models/poster_v2_rafdb.onnx`: emotion classification model.
 - `models/blaze_face_short_range.tflite`: face detector model.
+
+## Model Download
+
+Download the ONNX emotion model from Google Drive:
+
+https://drive.google.com/file/d/1H6Dh82HD8dWOgwKUbw7-VprPOlAgX8ua/view?usp=drive_link
+
+After downloading, place the file at:
+
+```text
+models/poster_v2_rafdb.onnx
+```
+
+The server and standalone runner both expect the model at that path.
 
 ## Requirements
 
