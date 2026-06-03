@@ -30,8 +30,8 @@ The server and standalone runner both expect the model at that path.
 Install the dependencies with:
 
 ```bash
-pip install -r requirements.txt
-```
+`pip install -r requirements.txt
+````
 
 If you want to use a virtual environment, activate it first and then install the requirements.
 

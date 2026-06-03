@@ -12,13 +12,19 @@ import json
 import os
 import time
 import threading
+import sys
 from typing import Any
+from pathlib import Path
 
 import cv2
 import numpy as np
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+
+ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 
 from main.app import CLASSES, build_detector, get_faces, load_model, predict
 
