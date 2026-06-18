@@ -1,11 +1,4 @@
 """
-═══════════════════════════════════════════════════════════════
-Requirements:
-    pip install -r requirements.txt
-
-Usage:
-    python app.py --model models/poster_v2_rafdb.onnx
-
 Controls:
     Q or ESC  — quit
     +  /  -   — raise / lower confidence threshold
