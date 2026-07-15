@@ -16,43 +16,62 @@ import onnxruntime as ort
 # ══════════════════════════════════════════════════════════════════════════════
 # CONSTANTS
 # ══════════════════════════════════════════════════════════════════════════════
+# RAF-DB Basic native order (folders 1..7 -> index 0..6), matching the
+# raf_resnet18 training config (cnn_raf/config.py EMOTION_NAMES). Short names
+# are used so they line up with the COLORS keys below.
 CLASSES = ['Surprise', 'Fear', 'Disgust', 'Happy', 'Sad', 'Angry', 'Neutral']
 
 COLORS = {
-    'Surprise': (0,   210, 255),
-    'Fear':     (160,  40, 200),
-    'Disgust':  (30,  160,  50),
-    'Happy':    (0,   200, 255),
-    'Sad':      (200,  80,  20),
     'Angry':    (30,   30, 220),
+    'Disgust':  (30,  160,  50),
+    'Fear':     (160,  40, 200),
+    'Happy':    (0,   200, 255),
     'Neutral':  (160, 160, 160),
+    'Sad':      (200,  80,  20),
+    'Surprise': (0,   210, 255),
 }
 
-IMG_SIZE       = 224
-FACE_PAD       = 0.25
+FACE_PAD       = 0.0   # raf_resnet18 trained on tight aligned crops; keep boxes tight
 SMOOTH_FRAMES  = 6
 DEFAULT_THRESH = 0.5
 FRAME_OUTPUT_JSON = os.path.join('results', 'frame_outputs.json')
 
-MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
-STD  = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+# ImageNet normalization stats, used by the RGB (ResNet-style) model path.
+IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+IMAGENET_STD  = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PREPROCESSING
 # ══════════════════════════════════════════════════════════════════════════════
-def preprocess(face_bgr: np.ndarray) -> np.ndarray:
-    rgb     = cv2.cvtColor(face_bgr, cv2.COLOR_BGR2RGB)
-    resized = cv2.resize(rgb, (IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_LINEAR)
-    img     = resized.astype(np.float32) / 255.0
-    img     = (img - MEAN) / STD
-    img     = img.transpose(2, 0, 1)
-    return img[np.newaxis].astype(np.float32)   # (1, 3, 224, 224)
+def preprocess(face_bgr: np.ndarray, input_shape: tuple[int, int, int]) -> np.ndarray:
+    """Preprocess a BGR face crop for the emotion ONNX model.
 
+    ``input_shape`` is given as (H, W, channels). Two model families are supported:
 
-def softmax(x: np.ndarray) -> np.ndarray:
-    e = np.exp(x - x.max())
-    return e / e.sum()
+    * ``channels == 1`` — FER2013 grayscale model. Produces an NHWC tensor
+      (1, H, W, 1) scaled to [0, 1]. That model has internal BatchNorm layers,
+      so no external mean/std normalization is applied.
+    * ``channels == 3`` — RGB ResNet-style model (e.g. raf_resnet18). Produces an
+      NCHW tensor (1, 3, H, W): BGR→RGB, scaled to [0, 1] and ImageNet-normalized.
+    """
+    input_height, input_width, channels = input_shape
+
+    if channels == 1:
+        gray    = cv2.cvtColor(face_bgr, cv2.COLOR_BGR2GRAY)
+        resized = cv2.resize(gray, (input_width, input_height), interpolation=cv2.INTER_LINEAR)
+        img     = resized.astype(np.float32) / 255.0
+        return img[np.newaxis, ..., np.newaxis]      # (1, H, W, 1) NHWC float32
+
+    if channels == 3:
+        rgb     = cv2.cvtColor(face_bgr, cv2.COLOR_BGR2RGB)
+        resized = cv2.resize(rgb, (input_width, input_height), interpolation=cv2.INTER_LINEAR)
+        img     = resized.astype(np.float32) / 255.0
+        img     = (img - IMAGENET_MEAN) / IMAGENET_STD
+        chw     = np.transpose(img, (2, 0, 1))       # HWC → CHW
+        return chw[np.newaxis, ...].astype(np.float32)  # (1, 3, H, W) NCHW float32
+
+    raise ValueError(f'Unsupported ONNX input channel count: {input_shape}')
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -78,11 +97,33 @@ def load_model(onnx_path: str) -> ort.InferenceSession:
 
 
 def predict(session: ort.InferenceSession, face_bgr: np.ndarray):
-    tensor     = preprocess(face_bgr)
-    input_name = session.get_inputs()[0].name
-    logits     = session.run(None, {input_name: tensor})[0][0]  # (7,)
-    probs      = softmax(logits)
-    idx        = int(probs.argmax())
+    input_meta = session.get_inputs()[0]
+    input_shape = input_meta.shape
+
+    if len(input_shape) != 4:
+        raise ValueError(f'Unsupported ONNX input shape: {input_shape}')
+
+    # FER2013 model is NHWC: (1, 48, 48, 1) — channels in the last dim.
+    # RAF ResNet model is NCHW: (1, 3, 224, 224) — channels in dim 1.
+    if input_shape[3] == 1:
+        tensor = preprocess(face_bgr, (int(input_shape[1]), int(input_shape[2]), int(input_shape[3])))
+    elif input_shape[1] == 3:
+        tensor = preprocess(face_bgr, (int(input_shape[2]), int(input_shape[3]), int(input_shape[1])))
+    else:
+        raise ValueError(f'Unsupported ONNX input shape: {input_shape}')
+
+    input_name = input_meta.name
+    out = session.run(None, {input_name: tensor})[0][0]  # (7,)
+
+    # The FER2013 graph ends in a Softmax (already a probability vector); the RAF
+    # model emits raw logits. Softmax only when the output isn't already normalized.
+    if out.min() < 0.0 or abs(float(out.sum()) - 1.0) > 1e-3:
+        exp   = np.exp(out - out.max())
+        probs = exp / exp.sum()
+    else:
+        probs = out
+
+    idx = int(probs.argmax())
     return CLASSES[idx], float(probs[idx]), probs
 
 
@@ -306,9 +347,9 @@ def run(onnx_path: str, camera_idx: int, threshold: float, mp_model: str = None)
 # ════════════════════════════a══════════════════════════════════════════════════
 if __name__ == '__main__':
     ap = argparse.ArgumentParser(
-        description='Realtime emotion recognition — POSTER V2 (ONNX) + MediaPipe')
+        description='Realtime emotion recognition — ONNX) + MediaPipe')
     ap.add_argument('--model',     required=True,
-                    help='Path to models/poster_v2_rafdb.onnx')
+                    help='Path to models/model.onnx')
     ap.add_argument('--camera',    type=int,   default=0,
                     help='Camera index (default 0)')
     ap.add_argument('--threshold', type=float, default=DEFAULT_THRESH,

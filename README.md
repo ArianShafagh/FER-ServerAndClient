@@ -20,7 +20,7 @@ https://drive.google.com/file/d/1H6Dh82HD8dWOgwKUbw7-VprPOlAgX8ua/view?usp=drive
 After downloading, place the file at:
 
 ```text
-models/poster_v2_rafdb.onnx
+models/fer_model.onnx
 ```
 
 The server and standalone runner both expect the model at that path.
@@ -72,7 +72,7 @@ python api/fastapi_client.py --server-url http://127.0.0.1:8000/predict-frame
 
 The server reads these optional environment variables:
 
-- `POSTER_MODEL_PATH`: path to the ONNX emotion model.
+- `ONNX_MODEL_PATH`: path to the ONNX emotion model. Defaults to `models/fer_model.onnx`.
 - `MP_FACE_MODEL_PATH`: path to the MediaPipe face detector model.
 - `FRAME_OUTPUT_JSON`: path where frame results are written.
 
@@ -80,5 +80,5 @@ The server reads these optional environment variables:
 
 - The client uses the default webcam unless you pass `--camera`.
 - The server expects the ONNX model and face detector file to be present in the project.
-- Large model files such as `models/poster_v2_rafdb.onnx` are intentionally kept out of Git history to avoid GitHub's 100 MB file limit.
+- Large model files such as `models/fer_model.onnx` are intentionally kept out of Git history to avoid GitHub's 100 MB file limit.
 - If you are on macOS and `python` is not available, use the interpreter inside your virtual environment.

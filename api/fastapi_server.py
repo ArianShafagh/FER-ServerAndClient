@@ -29,12 +29,15 @@ if str(ROOT_DIR) not in sys.path:
 from main.app import CLASSES, build_detector, get_faces, load_model, predict
 
 
-MODEL_PATH = os.getenv("POSTER_MODEL_PATH", os.path.join("models", "poster_v2_rafdb.onnx"))
-MP_MODEL_PATH = os.getenv("MP_FACE_MODEL_PATH", os.path.join("models", "blaze_face_short_range.tflite"))
-FRAME_OUTPUT_JSON = os.getenv("FRAME_OUTPUT_JSON", os.path.join("results", "frame_outputs.json"))
+MODEL_PATH = os.getenv(
+    "ONNX_MODEL_PATH",
+    str(ROOT_DIR / "models" / "raf_resnet18.onnx"),
+)
+MP_MODEL_PATH = os.getenv("MP_FACE_MODEL_PATH", str(ROOT_DIR / "models" / "blaze_face_short_range.tflite"))
+FRAME_OUTPUT_JSON = os.getenv("FRAME_OUTPUT_JSON", str(ROOT_DIR / "results" / "frame_outputs.json"))
 
 
-app = FastAPI(title="POSTER V2 Emotion API")
+app = FastAPI(title="ONNX Emotion API")
 
 app.add_middleware(
     CORSMiddleware,
