@@ -2,6 +2,8 @@
 
 Realtime facial emotion recognition with a FastAPI server, a webcam client, and an ONNX-based emotion model.
 
+> **Deploying on a Linux server?** See [DEPLOY.md](DEPLOY.md) for requirements, models and step-by-step instructions.
+
 ## Project Structure
 
 - [run.py](run.py): starts the server and client together.
@@ -20,7 +22,7 @@ https://drive.google.com/file/d/1H6Dh82HD8dWOgwKUbw7-VprPOlAgX8ua/view?usp=drive
 After downloading, place the file at:
 
 ```text
-models/fer_model.onnx
+models/raf_resnet18.onnx
 ```
 
 The server and standalone runner both expect the model at that path.
@@ -31,7 +33,7 @@ Install the dependencies with:
 
 ```bash
 pip install -r requirements.txt
-````
+```
 
 If you want to use a virtual environment, activate it first and then install the requirements.
 
@@ -72,7 +74,7 @@ python api/fastapi_client.py --server-url http://127.0.0.1:8000/predict-frame
 
 The server reads these optional environment variables:
 
-- `ONNX_MODEL_PATH`: path to the ONNX emotion model. Defaults to `models/fer_model.onnx`.
+- `ONNX_MODEL_PATH`: path to the ONNX emotion model. Defaults to `models/raf_resnet18.onnx`.
 - `MP_FACE_MODEL_PATH`: path to the MediaPipe face detector model.
 - `FRAME_OUTPUT_JSON`: path where frame results are written.
 
@@ -80,5 +82,5 @@ The server reads these optional environment variables:
 
 - The client uses the default webcam unless you pass `--camera`.
 - The server expects the ONNX model and face detector file to be present in the project.
-- Large model files such as `models/fer_model.onnx` are intentionally kept out of Git history to avoid GitHub's 100 MB file limit.
+- Large model files such as `models/raf_resnet18.onnx` are intentionally kept out of Git history to avoid GitHub's 100 MB file limit.
 - If you are on macOS and `python` is not available, use the interpreter inside your virtual environment.
